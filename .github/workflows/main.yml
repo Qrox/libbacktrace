@@ -1,0 +1,76 @@
+name: Build
+
+on:
+  push:
+    branches:
+    - build
+
+jobs:
+  build:
+    name: w64-mingw32
+    runs-on: windows-latest
+
+    steps:
+    - name: checkout
+      uses: actions/checkout@v1
+      with:
+        fetch-depth: 1
+    - name: make-x86_64
+      shell: bash
+      run: |
+        mkdir build-x86_64
+        cd build-x86_64
+        ../configure
+        make CFLAGS=-m64
+    - name: make-i686
+      shell: bash
+      run: |
+        mkdir build-i686
+        cd build-i686
+        ../configure
+        make CFLAGS=-m32
+    - name: package
+      shell: bash
+      run: |
+        cd build-x86_64
+        mkdir include
+        ln ../backtrace.h include
+        ln -s .libs lib
+        ln ../LICENSE
+        tar -zcf libbacktrace-x86_64-w64-mingw32.tar.gz include lib LICENSE
+        cd ../build-i686
+        mkdir include
+        ln ../backtrace.h include
+        ln -s .libs lib
+        ln ../LICENSE
+        tar -zcf libbacktrace-i686-w64-mingw32.tar.gz include lib LICENSE
+    - name: create release
+      id: create_release
+      uses: actions/create-release@v1.0.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: release-latest
+        release_name: Latest release
+        draft: false
+        prerelease: false
+    - name: upload x86_64 release asset
+      id: upload-release-asset-x86-64
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: build-x86_64/libbacktrace-x86_64-w64-mingw32.tar.gz
+        asset_name: libbacktrace-x86_64-w64-mingw32.tar.gz
+        asset_content_type: application/gzip
+    - name: upload i686 release asset
+      id: upload-release-asset-i686
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: build-i686/libbacktrace-i686-w64-mingw32.tar.gz
+        asset_name: libbacktrace-i686-w64-mingw32.tar.gz
+        asset_content_type: application/gzip
